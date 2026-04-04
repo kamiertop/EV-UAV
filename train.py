@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     #for val
     val_dataset = EvUAV(cfg, mode='val')
-    val_dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size,collate_fn=dataset.custom_collate)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,collate_fn=dataset.custom_collate)
     evaluter = evalute(cfg)
 
     # mlflow
