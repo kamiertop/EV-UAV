@@ -4,7 +4,7 @@ import spconv.pytorch as spconv
 import functools
 from spconv.pytorch import functional as Fsp
 from model.basemodel import GDBlock,Downsample_block
-from lib.hais_ops import HAIS_OP
+import HAIS_OP
 from configs.configs import cfg
 import math
 import os

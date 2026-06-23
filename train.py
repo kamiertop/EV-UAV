@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     #for val
     val_dataset = EvUAV(cfg, mode='val')
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,collate_fn=dataset.custom_collate)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,collate_fn=val_dataset.custom_collate)
     evaluter = evalute(cfg)
 
     # mlflow
@@ -110,4 +110,4 @@ if __name__ == '__main__':
 
                 if iou.item() > best_iou:
                     torch.save(net.state_dict(), cfg.model_save_root + '/best_iou_seed{}.pt'.format(seed))
-                    best_loss = loss.item()
+                    best_iou = iou.item()

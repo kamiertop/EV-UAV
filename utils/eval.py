@@ -47,9 +47,9 @@ class evalute():
             false_ev = ev_locs_frame[(label_frame == 0) * (preds_frame == 1)]
             for ii in range(false_ev.shape[0]):
                 false_mask[int(false_ev[:, 1][ii]), int(false_ev[:, 0][ii])] += 1  # 将虚警点映射为帧
-                num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(false_mask, connectivity=8,
-                                                                                        ltype=cv2.CV_32S)
-                self.false_num += (num_labels - 1)
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(false_mask, connectivity=8,
+                                                                                    ltype=cv2.CV_32S)
+            self.false_num += (num_labels - 1)
 
     def cal_roc(self):
         pd = self.correct_num / self.obj_num

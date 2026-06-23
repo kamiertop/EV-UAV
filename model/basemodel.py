@@ -7,7 +7,7 @@ from torch.autograd import Function
 
 import functools
 from collections import OrderedDict
-from lib.hais_ops import HAIS_OP
+import HAIS_OP
 
 
 class BaseModel(nn.Module):

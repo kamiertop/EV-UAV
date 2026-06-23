@@ -9,6 +9,12 @@
 </p>
 The official implementation of "Event-based Tiny Object Detection: A Benchmark Dataset and Baseline" (ICCV 2025) [Paper](https://arxiv.org/abs/2506.23575)
 
+# Update
+
+2026.6.23  We have fixed some bugs.
+
+
+
 ## 🌟 Abstract
 
 Small object detection (SOD) in anti-UAV  task is a challenging problem due to the small size of UAVs and complex backgrounds. Traditional frame-based cameras struggle to detect small objects in complex environments due to their low frame rates, limited dynamic range, and data redundancy. Event cameras, with microsecond temporal resolution and high dynamic range, provide a more effective solution for SOD. However, existing event-based object detection datasets  are limited in scale, feature large targets size, and lack diverse backgrounds, making them unsuitable for SOD benchmarks. In this paper, we introduce a Event-based Small object detection (EVSOD) dataset (namely **EV-UAV**), the first large-scale, highly diverse benchmark for anti-UAV tasks. It includes 147 sequences with over **2.3 million event-level annotations,** featuring **extremely small targets** (averaging 6.8 × 5.4 pixels) and **diverse scenarios** such as urban clutter and extreme lighting conditions. Furthermore, based on the observation that small moving targets form continuous curves in spatiotemporal event point clouds, we propose Event based Sparse Segmentation Network (EV-SpSegNet), a novel baseline for event segmentation in point cloud space, along with a Spatiotemporal Correlation (STC) loss that leverages motion continuity to guide the network in retaining target events. Extensive experiments on the EV-UAV dataset demonstrate the superiority of our method and provide a benchmark for future research in EVSOD.
@@ -257,7 +263,7 @@ export CPLUS_INCLUDE_PATH={conda_env_path}/hais/include:$CPLUS_INCLUDE_PATH
 python setup.py build_ext develop
 ```
 
-## 🎯Running code
+# 🎯Running code
 
 **1) Configuration file**: change the dataset root and the model save root by yourself
 

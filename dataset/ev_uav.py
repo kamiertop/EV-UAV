@@ -12,8 +12,8 @@ class EvUAV(BaseDataLoader):
         self.root = os.path.join(self.root,mode)
         self.file_list = os.listdir(self.root)
 
-    def __getitem__(self, idx):
-        events = np.load(os.path.join(self.root,self.file_list[idx]))
+    def __getitem__(self, num):
+        events = np.load(os.path.join(self.root,self.file_list[num]))
         evs_norm,ev_loc,seg_label,idx= events['evs_norm'][:,0:4],events['ev_loc'],events['evs_norm'][:,4],events['evs_norm'][:,5]
 
 
@@ -25,7 +25,7 @@ class EvUAV(BaseDataLoader):
                 evs_norm=evs_norm[dowmsample_idx]
                 seg_label = seg_label[dowmsample_idx]
                 idx = idx[dowmsample_idx]
-                print('downsample')
+
 
         out={}
         out['ev_loc']=ev_loc

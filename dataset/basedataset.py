@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch.autograd import Function
-from lib.hais_ops import HAIS_OP
+import HAIS_OP
 import spconv.pytorch as spconv
 
 class Voxelization_Idx(Function):

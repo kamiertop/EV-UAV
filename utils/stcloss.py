@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Function
-from lib.hais_ops import HAIS_OP
+import HAIS_OP
 import numpy as np
 import spconv.pytorch as spconv
 

@@ -48,8 +48,11 @@ if __name__ == '__main__':
         iou = evaluter.evaluate_semantic_segmantation_miou()
         seg_acc = evaluter.evaluate_semantic_segmantation_accuracy()
         if cfg.roc:
-            pd, fa= evaluter.cal_roc()
-        print('iou:{},seg_acc:{},pd:{},fa:{}'.format(iou,seg_acc,pd,fa))
+            pd, fa = evaluter.cal_roc()
+            print('iou:{},seg_acc:{},pd:{},fa:{}'.format(iou, seg_acc, pd, fa))
+        else:
+            print('iou:{},seg_acc:{}'.format(iou, seg_acc))
+
 
 
 

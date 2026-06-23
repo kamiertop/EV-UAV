@@ -39,7 +39,7 @@ if __name__ == '__main__':
     evs_loc = events['ev_loc']
     points = evs_loc[:,0:3]
     label = evs_norm[:,4]
-    show_points_matplt(points,label,0)
+    show_points_matplt(points,label)
 
 
 
