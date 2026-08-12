@@ -19,6 +19,7 @@ build/
 
 # C extensions (compiled .so)
 *.cpython-*.so
+HAIS_OP*.so
 
 # Python packaging artifacts
 *.egg-info/
@@ -69,3 +70,9 @@ logs/
 # Hugging Face
 .accelerate/
 .cache/huggingface/
+.claude
+.codex
+
+tmp
+
+runs

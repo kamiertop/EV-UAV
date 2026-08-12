@@ -1,72 +1,86 @@
-import os
-from configs.configs import cfg
-import torch
-import torch.nn as nn
-import numpy as np
-from dataset.ev_uav import EvUAV
-import random
-from model.evspsegnet import evspsegnet
-from utils.stcloss import STCLoss
+"""EV-UAV training script.
 
+Usage::
+
+    uv run python train.py                          # GPU 0, defaults
+    uv run python train.py --gpu 1 --epochs 100     # GPU 1, 100 epochs
+    uv run python train.py --data_dir /path/to/data # custom dataset
+"""
+
+import os
+
+import torch
 import torch.optim as optim
 import tqdm
-from utils.eval import evalute
 
-def setup(seed):
-    seed_n = seed
-    print('random seed:' + str(seed_n))
-    g = torch.Generator()
-    g.manual_seed(seed_n)
-    random.seed(seed_n)
-    np.random.seed(seed_n)
-    torch.manual_seed(seed_n)
-    torch.cuda.manual_seed(seed_n)
-    torch.cuda.manual_seed_all(seed_n)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.enabled = False
-    torch.use_deterministic_algorithms(True)
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
-    os.environ['PYTHONHASHSEED'] = str(seed_n)
+from dataset.ev_uav import EvUAV
+from model.evspsegnet import evspsegnet
+from utils import args
+from utils.eval import evalute, run_test
+from utils.run_manager import RunManager
+from utils.seed import set_seed
+from utils.stcloss import STCLoss
 
-if __name__ == '__main__':
 
-    seed=37
-    setup(seed)
-    device = "cuda:0"
+def main():
+    args.parse()
 
-    net = evspsegnet(cfg).train()
-    net.cuda()
+    device = f"cuda:{args.cfg.gpu}"
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cfg.gpu
 
-    dataset = EvUAV(cfg,mode='train')
-    train_sampler = torch.utils.data.sampler.RandomSampler(list(range(len(dataset))))
-    train_dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size, collate_fn=dataset.custom_collate, sampler=train_sampler)
+    # ── run manager ─────────────────────────────────────────────────
+    run = RunManager(root="runs", prefix="train")
+    run.save_config(args.cfg)
+    print(f"[train] Run directory: {run.run_dir}")
 
-    stc_criterion = STCLoss(k=cfg.k,t=cfg.t,cfg=cfg).cuda()
+    # ── reproducibility ─────────────────────────────────────────────
+    set_seed(args.cfg.seed)
+    run.log_metric(0, None, seed=args.cfg.seed)
 
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=cfg.lr)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    # ── model ───────────────────────────────────────────────────────
+    net = evspsegnet(args.cfg).train().to(device)
 
+    # ── data ────────────────────────────────────────────────────────
+    dataset = EvUAV(args.cfg, mode="train")
+    train_sampler = torch.utils.data.sampler.RandomSampler(range(len(dataset)))
+    train_dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=args.cfg.batch_size,
+        collate_fn=dataset.custom_collate, sampler=train_sampler,
+    )
+
+    val_dataset = EvUAV(args.cfg, mode="val")
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=args.cfg.batch_size,
+        collate_fn=val_dataset.custom_collate,
+    )
+    evaluator = evalute(args.cfg)
+
+    # ── loss / optim / scheduler ────────────────────────────────────
+    stc_criterion = STCLoss(k=args.cfg.k, t=args.cfg.t, cfg=args.cfg).to(device)
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, net.parameters()), lr=args.cfg.lr,
+    )
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=10, gamma=0.1,
+    )
+
+    # ── training loop ───────────────────────────────────────────────
     best_loss = 1e5
-    best_iou=0
+    best_iou = 0.0
 
-    #for val
-    val_dataset = EvUAV(cfg, mode='val')
-    val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,collate_fn=val_dataset.custom_collate)
-    evaluter = evalute(cfg)
+    for epoch in range(args.cfg.epochs):
+        pbar = tqdm.tqdm(
+            total=len(train_dataloader), unit="Batch", unit_scale=True,
+            desc=f"Epoch: {epoch}", position=0, leave=True,
+        )
 
-    for epoch in range(cfg.epochs):
-        pbar = tqdm.tqdm(total=len(train_dataloader), unit="Batch", unit_scale=True,
-                         desc="Epoch: {}".format(epoch),position=0,leave=True)
+        for batch_idx, ev in enumerate(train_dataloader):
+            x = ev["voxel_ev"]
+            label = ev["seg_label"].float().to(device)
+            p2v_map = ev["p2v_map"].long().to(device)
+            ev_locs = ev["locs"].float().requires_grad_()
 
-        for ev in train_dataloader:
-            x = ev['voxel_ev']
-            label = ev['seg_label'].float().cuda()
-            p2v_map = ev['p2v_map'].long().cuda()
-            ev_locs = ev['locs'].float().requires_grad_()
-
-            preds,voxel = net(x)
-
+            preds, voxel = net(x)
             loss = stc_criterion(voxel, p2v_map, preds, label)
 
             optimizer.zero_grad()
@@ -77,31 +91,63 @@ if __name__ == '__main__':
             pbar.update(1)
 
             with torch.no_grad():
-                if loss.item()<best_loss:
-                    torch.save(net.state_dict(),cfg.model_save_root+'/best_loss_seed{}.pt'.format(seed))
+                run.log_metric(epoch, batch_idx, loss=loss.item())
+                if loss.item() < best_loss:
+                    run.save_checkpoint(net, f"best_loss_seed{args.cfg.seed}.pt")
                     best_loss = loss.item()
+
             torch.cuda.empty_cache()
 
         scheduler.step()
 
+        # ---- validation ----
+        if epoch < 40:
+            continue
+
         with torch.no_grad():
-            if epoch>=40:
-                for sample, ev in enumerate(val_dataloader):
-                    x = ev['voxel_ev']
-                    label = ev['seg_label'].float().cuda()
-                    p2v_map = ev['p2v_map'].long().cuda()
-                    ev_locs = ev['locs'].float().requires_grad_()
-                    idx = ev['idx_label']
-                    ts = ev_locs[:, 3]
+            for sample, ev in enumerate(val_dataloader):
+                x = ev["voxel_ev"]
+                label = ev["seg_label"].float().to(device)
+                p2v_map = ev["p2v_map"].long().to(device)
 
-                    preds, voxel = net(x)
-                    preds = preds[p2v_map].squeeze().cpu()
+                preds, voxel = net(x)
+                preds = preds[p2v_map].squeeze().cpu()
 
-                    evaluter.matches[str(sample)] = {}
-                    evaluter.matches[str(sample)]['seg_pred'] = preds
-                    evaluter.matches[str(sample)]['seg_gt'] = label
-                iou = evaluter.evaluate_semantic_segmantation_miou()
+                evaluator.matches[str(sample)] = {
+                    "seg_pred": preds,
+                    "seg_gt": label,
+                }
 
-                if iou.item() > best_iou:
-                    torch.save(net.state_dict(), cfg.model_save_root + '/best_iou_seed{}.pt'.format(seed))
-                    best_iou = iou.item()
+            iou = evaluator.evaluate_semantic_segmantation_miou()
+            run.log_metric(epoch, None, iou=iou.item())
+
+            if iou.item() > best_iou:
+                run.save_checkpoint(net, f"best_iou_seed{args.cfg.seed}.pt")
+                best_iou = iou.item()
+
+    run.log_metric(args.cfg.epochs, None, best_loss=best_loss, best_iou=best_iou)
+    print(f"[train] Done. Best loss={best_loss:.4f}, best IoU={best_iou:.4f}")
+
+    # ── test on best checkpoint ─────────────────────────────────────
+    best_ckpt = run.ckpt_dir / f"best_iou_seed{args.cfg.seed}.pt"
+    if best_ckpt.exists():
+        print(f"[train] Running evaluation on best checkpoint...")
+        results = run_test(str(best_ckpt), args.cfg, device=device)
+        run.log_metric(args.cfg.epochs, None, test_iou=results.get("iou", float("nan")),
+                       test_seg_acc=results.get("seg_acc", float("nan")))
+        if "pd" in results:
+            print(f"[train] Test — iou={results['iou']:.4f}  "
+                  f"seg_acc={results['seg_acc']:.4f}  "
+                  f"pd={results['pd']:.4f}  fa={results['fa']:.4f}")
+        else:
+            print(f"[train] Test — iou={results['iou']:.4f}  "
+                  f"seg_acc={results['seg_acc']:.4f}")
+    else:
+        print(f"[train] No best-iou checkpoint found, skipping evaluation.")
+
+    print(f"[train] Results saved to: {run.run_dir}")
+    run.close()
+
+
+if __name__ == "__main__":
+    main()

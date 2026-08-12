@@ -1,61 +1,29 @@
-import torch
-from configs.configs import cfg
-from dataset.ev_uav import EvUAV
-from model.evspsegnet import evspsegnet
-from utils.eval import evalute
-import tqdm
+"""EV-UAV evaluation script (standalone).
 
-if __name__ == '__main__':
-    device = "cuda:0"
+Usage::
 
-    net = evspsegnet(cfg).eval()
-    net.cuda()
+    uv run python test.py --model_path runs/train_xxx/checkpoints/best_iou_seed37.pt
+"""
 
-    dataset = EvUAV(cfg, mode='test')
+import os
 
-    test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg.batch_size,collate_fn=dataset.custom_collate)
-
-    net.load_state_dict(torch.load(cfg.model_path))
-    print('dict load: ',cfg.model_path)
+from utils import args
+from utils.eval import run_test
 
 
-    pbar = tqdm.tqdm(total=len(test_dataloader), desc='video', unit='video',unit_scale=True,position=0, leave=True)
+def main():
+    args.parse()
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cfg.gpu
 
-    evaluter = evalute(cfg)
+    device = f"cuda:{args.cfg.gpu}"
+    results = run_test(args.cfg.model_path, args.cfg, device=device)
 
-    for sample,ev in enumerate(test_dataloader):
-        with torch.no_grad():
-            x = ev['voxel_ev']
-            label = ev['seg_label'].float().cuda()
-            p2v_map = ev['p2v_map'].long().cuda()
-            ev_locs = ev['locs'].float().requires_grad_()
-            idx = ev['idx_label']
-            ts = ev_locs[:,3]
-
-            preds, voxel = net(x)
-            preds = preds[p2v_map].squeeze().cpu()
-
-            if cfg.eval:
-                evaluter.matches[str(sample)] = {}
-                evaluter.matches[str(sample)]['seg_pred']= preds
-                evaluter.matches[str(sample)]['seg_gt'] = label
-                if cfg.roc:
-                    evaluter.roc_update(ts,preds,idx,label.cpu(),ev_locs)
-
-        pbar.update(1)
-
-    if cfg.eval:
-        iou = evaluter.evaluate_semantic_segmantation_miou()
-        seg_acc = evaluter.evaluate_semantic_segmantation_accuracy()
-        if cfg.roc:
-            pd, fa = evaluter.cal_roc()
-            print('iou:{},seg_acc:{},pd:{},fa:{}'.format(iou, seg_acc, pd, fa))
-        else:
-            print('iou:{},seg_acc:{}'.format(iou, seg_acc))
+    if "pd" in results:
+        print(f"iou={results['iou']:.4f}  seg_acc={results['seg_acc']:.4f}  "
+              f"pd={results['pd']:.4f}  fa={results['fa']:.4f}")
+    else:
+        print(f"iou={results['iou']:.4f}  seg_acc={results['seg_acc']:.4f}")
 
 
-
-
-
-
-
+if __name__ == "__main__":
+    main()

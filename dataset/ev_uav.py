@@ -1,5 +1,5 @@
 import os
-from configs.configs import cfg
+from utils import args
 import torch
 import numpy as np
 from dataset.basedataset import BaseDataLoader
@@ -9,18 +9,18 @@ class EvUAV(BaseDataLoader):
         super().__init__(configs)
 
         self.mode = mode
-        self.root = os.path.join(self.root,mode)
-        self.file_list = os.listdir(self.root)
+        self.data_dir = os.path.join(self.data_dir,mode)
+        self.file_list = os.listdir(self.data_dir)
 
     def __getitem__(self, num):
-        events = np.load(os.path.join(self.root,self.file_list[num]))
+        events = np.load(os.path.join(self.data_dir,self.file_list[num]))
         evs_norm,ev_loc,seg_label,idx= events['evs_norm'][:,0:4],events['ev_loc'],events['evs_norm'][:,4],events['evs_norm'][:,5]
 
 
         if self.mode=='train':
             num_events = ev_loc.shape[0]
-            if num_events >= cfg.max_events_num:
-                dowmsample_idx = np.random.choice(num_events,cfg.max_events_num,replace=False)
+            if num_events >= args.cfg.max_events_num:
+                dowmsample_idx = np.random.choice(num_events,args.cfg.max_events_num,replace=False)
                 ev_loc = ev_loc[dowmsample_idx]
                 evs_norm=evs_norm[dowmsample_idx]
                 seg_label = seg_label[dowmsample_idx]

@@ -5,7 +5,7 @@ import functools
 from spconv.pytorch import functional as Fsp
 from model.basemodel import GDBlock,Downsample_block
 import HAIS_OP
-from configs.configs import cfg
+from utils import args as _args
 import math
 import os
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -106,8 +106,8 @@ class evspsegnet(nn.Module):
     def __init__(self,cfg):
         super().__init__()
 
-        input_channels = cfg.input_channel
-        width=cfg.width
+        input_channels = _args.cfg.input_channel
+        width=_args.cfg.width
 
         norm_fn = functools.partial(nn.BatchNorm1d, eps=1e-3, momentum=0.01)
 

@@ -1,9 +1,67 @@
 import os.path
+from pathlib import Path
+
 import torch
 import cv2
 import numpy as np
 import pandas as pd
 import tqdm
+
+
+def run_test(model_path: str, cfg, *, device: str = "cuda:0") -> dict:
+    """Load a checkpoint and evaluate on the test set.
+
+    Returns a dict with keys ``iou``, ``seg_acc``, and optionally
+    ``pd`` / ``fa`` (when ``cfg.roc`` is enabled).
+    """
+    from dataset.ev_uav import EvUAV
+    from model.evspsegnet import evspsegnet
+
+    net = evspsegnet(cfg).eval().to(device)
+    net.load_state_dict(torch.load(model_path, weights_only=True))
+    print(f"[eval] Loaded checkpoint: {model_path}")
+
+    dataset = EvUAV(cfg, mode="test")
+    loader = torch.utils.data.DataLoader(
+        dataset, batch_size=cfg.batch_size,
+        collate_fn=dataset.custom_collate,
+    )
+
+    evaluator = evalute(cfg)
+    pbar = tqdm.tqdm(
+        total=len(loader), desc="Test", unit="video",
+        unit_scale=True, position=0, leave=True,
+    )
+
+    for sample, ev in enumerate(loader):
+        with torch.no_grad():
+            x = ev["voxel_ev"]
+            label = ev["seg_label"].float().to(device)
+            p2v_map = ev["p2v_map"].long().to(device)
+            ev_locs = ev["locs"].float().requires_grad_()
+            idx = ev["idx_label"]
+            ts = ev_locs[:, 3]
+
+            preds, voxel = net(x)
+            preds = preds[p2v_map].squeeze().cpu()
+
+            if cfg.eval:
+                evaluator.matches[str(sample)] = {
+                    "seg_pred": preds,
+                    "seg_gt": label,
+                }
+                if cfg.roc:
+                    evaluator.roc_update(ts, preds, idx, label.cpu(), ev_locs)
+
+        pbar.update(1)
+
+    results: dict = {}
+    if cfg.eval:
+        results["iou"] = evaluator.evaluate_semantic_segmantation_miou()
+        results["seg_acc"] = evaluator.evaluate_semantic_segmantation_accuracy()
+        if cfg.roc:
+            results["pd"], results["fa"] = evaluator.cal_roc()
+    return results
 
 
 class evalute():

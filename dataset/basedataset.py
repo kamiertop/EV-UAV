@@ -21,7 +21,7 @@ class Voxelization_Idx(Function):
         N = coords.size(0)
         output_coords = coords.new()
 
-        input_map = torch.IntTensor(N).zero_()
+        input_map = torch.zeros(N, dtype=torch.int32)
         output_map = input_map.new()
 
         HAIS_OP.voxelize_idx(coords, output_coords, input_map, output_map, batchsize, mode)
@@ -47,7 +47,7 @@ class Voxelization(Function):
         M = map_rule.size(0)
         maxActive = map_rule.size(1) - 1
 
-        output_feats = torch.cuda.FloatTensor(M, C).zero_()
+        output_feats = torch.zeros(M, C, device="cuda")
 
         ctx.for_backwards = (map_rule, mode, maxActive, N)
 
@@ -59,7 +59,7 @@ class Voxelization(Function):
         map_rule, mode, maxActive, N = ctx.for_backwards
         M, C = d_output_feats.size()
 
-        d_feats = torch.cuda.FloatTensor(N, C).zero_()
+        d_feats = torch.zeros(N, C, device="cuda")
 
         HAIS_OP.voxelize_bp(d_output_feats.contiguous(), d_feats, map_rule, mode, M, maxActive, C)
         return d_feats, None, None
@@ -75,7 +75,7 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
     def __init__(self, configs):
         self.configs = configs
-        self.root = configs.root
+        self.data_dir = configs.data_dir
         self.whole_t = configs.whole_t
         self.res = configs.res
 

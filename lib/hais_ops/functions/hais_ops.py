@@ -95,8 +95,8 @@ class CalIoUAndMasklabel(Function):
 
         nInstance = instance_pointnum.size(0)
         nProposal = proposals_offset.size(0) - 1
-        proposals_iou = torch.cuda.FloatTensor(nProposal, nInstance).zero_()
-        mask_label = torch.cuda.FloatTensor(mask_scores_sigmoid.shape).zero_() - 1.
+        proposals_iou = torch.zeros(nProposal, nInstance, device="cuda")
+        mask_label = torch.full(mask_scores_sigmoid.shape, -1., device="cuda")
 
         assert proposals_idx.is_contiguous() and proposals_idx.is_cuda
         assert proposals_offset.is_contiguous() and proposals_offset.is_cuda
@@ -132,7 +132,7 @@ class Voxelization_Idx(Function):
         N = coords.size(0)
         output_coords = coords.new()
 
-        input_map = torch.IntTensor(N).zero_()
+        input_map = torch.zeros(N, dtype=torch.int32)
         output_map = input_map.new()
 
         HAIS_OP.voxelize_idx(coords, output_coords, input_map, output_map, batchsize, mode)
@@ -160,7 +160,7 @@ class Voxelization(Function):
         M = map_rule.size(0)
         maxActive = map_rule.size(1) - 1
 
-        output_feats = torch.cuda.FloatTensor(M, C).zero_()
+        output_feats = torch.zeros(M, C, device="cuda")
 
         ctx.for_backwards = (map_rule, mode, maxActive, N)
 
@@ -173,7 +173,7 @@ class Voxelization(Function):
         map_rule, mode, maxActive, N = ctx.for_backwards
         M, C = d_output_feats.size()
 
-        d_feats = torch.cuda.FloatTensor(N, C).zero_()
+        d_feats = torch.zeros(N, C, device="cuda")
 
         HAIS_OP.voxelize_bp(d_output_feats.contiguous(), d_feats, map_rule, mode, M, maxActive, C)
         return d_feats, None, None
@@ -196,7 +196,7 @@ class PointRecover(Function):
         M, C = feats.size()
         maxActive = map_rule.size(1) - 1
 
-        output_feats = torch.cuda.FloatTensor(nPoint, C).zero_()
+        output_feats = torch.zeros(nPoint, C, device="cuda")
 
         ctx.for_backwards = (map_rule, maxActive, M)
 
@@ -209,7 +209,7 @@ class PointRecover(Function):
         map_rule, maxActive, M = ctx.for_backwards
         N, C = d_output_feats.size()
 
-        d_feats = torch.cuda.FloatTensor(M, C).zero_()
+        d_feats = torch.zeros(M, C, device="cuda")
 
         HAIS_OP.point_recover_bp(d_output_feats.contiguous(), d_feats, map_rule, M, maxActive, C)
 
@@ -239,8 +239,8 @@ class BallQueryBatchP(Function):
         assert batch_offsets.is_contiguous() and batch_offsets.is_cuda
 
         while True:
-            idx = torch.cuda.IntTensor(n * meanActive).zero_()
-            start_len = torch.cuda.IntTensor(n, 2).zero_()
+            idx = torch.zeros(n * meanActive, dtype=torch.int32, device="cuda")
+            start_len = torch.zeros(n, 2, dtype=torch.int32, device="cuda")
             nActive = HAIS_OP.ballquery_batch_p(coords, batch_idxs, batch_offsets, idx, start_len, n, meanActive, radius)
             if nActive <= n * meanActive:
                 break
@@ -303,8 +303,8 @@ class RoiPool(Function):
         assert feats.is_contiguous()
         assert proposals_offset.is_contiguous()
 
-        output_feats = torch.cuda.FloatTensor(nProposal, C).zero_()
-        output_maxidx = torch.cuda.IntTensor(nProposal, C).zero_()
+        output_feats = torch.zeros(nProposal, C, device="cuda")
+        output_maxidx = torch.zeros(nProposal, C, dtype=torch.int32, device="cuda")
 
         HAIS_OP.roipool_fp(feats, proposals_offset, output_feats, output_maxidx, nProposal, C)
 
@@ -318,7 +318,7 @@ class RoiPool(Function):
 
         output_maxidx, proposals_offset, sumNPoint = ctx.for_backwards
 
-        d_feats = torch.cuda.FloatTensor(sumNPoint, C).zero_()
+        d_feats = torch.zeros(sumNPoint, C, device="cuda")
 
         HAIS_OP.roipool_bp(d_feats, proposals_offset, output_maxidx, d_output_feats.contiguous(), nProposal, C)
 
@@ -346,7 +346,7 @@ class GetIoU(Function):
         assert instance_labels.is_contiguous() and instance_labels.is_cuda
         assert instance_pointnum.is_contiguous() and instance_pointnum.is_cuda
 
-        proposals_iou = torch.cuda.FloatTensor(nProposal, nInstance).zero_()
+        proposals_iou = torch.zeros(nProposal, nInstance, device="cuda")
 
         HAIS_OP.get_iou(proposals_idx, proposals_offset, instance_labels, instance_pointnum, proposals_iou, nInstance, nProposal)
 
@@ -374,7 +374,7 @@ class SecMean(Function):
         assert inp.is_contiguous()
         assert offsets.is_contiguous()
 
-        out = torch.cuda.FloatTensor(nProposal, C).zero_()
+        out = torch.zeros(nProposal, C, device="cuda")
 
         HAIS_OP.sec_mean(inp, offsets, out, nProposal, C)
 
@@ -402,7 +402,7 @@ class SecMin(Function):
         assert inp.is_contiguous()
         assert offsets.is_contiguous()
 
-        out = torch.cuda.FloatTensor(nProposal, C).zero_()
+        out = torch.zeros(nProposal, C, device="cuda")
 
         HAIS_OP.sec_min(inp, offsets, out, nProposal, C)
 
@@ -430,7 +430,7 @@ class SecMax(Function):
         assert inp.is_contiguous()
         assert offsets.is_contiguous()
 
-        out = torch.cuda.FloatTensor(nProposal, C).zero_()
+        out = torch.zeros(nProposal, C, device="cuda")
 
         HAIS_OP.sec_max(inp, offsets, out, nProposal, C)
 
