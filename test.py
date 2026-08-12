@@ -5,16 +5,12 @@ Usage::
     uv run python test.py --model_path runs/train_xxx/checkpoints/best_iou_seed37.pt
 """
 
-import os
-
 from utils import args
 from utils.eval import run_test
 
 
 def main():
     args.parse()
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.cfg.gpu
-
     device = f"cuda:{args.cfg.gpu}"
     results = run_test(args.cfg.model_path, args.cfg, device=device)
 

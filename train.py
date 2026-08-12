@@ -7,8 +7,6 @@ Usage::
     uv run python train.py --data_dir /path/to/data # custom dataset
 """
 
-import os
-
 import torch
 import torch.optim as optim
 import tqdm
@@ -26,7 +24,6 @@ def main():
     args.parse()
 
     device = f"cuda:{args.cfg.gpu}"
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.cfg.gpu
 
     # ── run manager ─────────────────────────────────────────────────
     run = RunManager(root="runs", prefix="train")
