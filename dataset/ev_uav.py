@@ -1,6 +1,5 @@
 import os
 from utils import args
-import torch
 import numpy as np
 from dataset.basedataset import BaseDataLoader
 
@@ -11,10 +10,21 @@ class EvUAV(BaseDataLoader):
         self.mode = mode
         self.data_dir = os.path.join(self.data_dir,mode)
         self.file_list = os.listdir(self.data_dir)
+        self._cache = []
+        for filename in self.file_list:
+            with np.load(os.path.join(self.data_dir, filename)) as events:
+                evs_norm = events['evs_norm']
+                # Copy arrays before closing the NPZ archive so samples remain
+                # fully resident in memory and no file handles stay open.
+                self._cache.append((
+                    evs_norm[:, :4].copy(),
+                    events['ev_loc'].copy(),
+                    evs_norm[:, 4].copy(),
+                    evs_norm[:, 5].copy(),
+                ))
 
     def __getitem__(self, num):
-        events = np.load(os.path.join(self.data_dir,self.file_list[num]))
-        evs_norm,ev_loc,seg_label,idx= events['evs_norm'][:,0:4],events['ev_loc'],events['evs_norm'][:,4],events['evs_norm'][:,5]
+        evs_norm, ev_loc, seg_label, idx = self._cache[num]
 
 
         if self.mode=='train':
@@ -38,5 +48,3 @@ class EvUAV(BaseDataLoader):
 
     def __len__(self):
         return len(self.file_list)
-
-
