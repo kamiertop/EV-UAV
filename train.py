@@ -24,6 +24,7 @@ def main():
     args.parse()
 
     device = f"cuda:{args.cfg.gpu}"
+    torch.cuda.set_device(device)
 
     # ── run manager ─────────────────────────────────────────────────
     run = RunManager(root="runs", prefix="train")
