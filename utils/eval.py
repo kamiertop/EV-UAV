@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import tqdm
 
+from utils import args as _args
+
 
 def run_test(model_path: str, cfg, *, device: str = "cuda:0") -> dict:
     """Load a checkpoint and evaluate on the test set.
@@ -137,13 +139,14 @@ class evalute():
         return miou
 
     def evaluate_semantic_segmantation_accuracy(self, thresh=0.9):
+        device = f"cuda:{_args.cfg.gpu}"
         seg_gt_list = []
         seg_pred_list = []
         for k, v in self.matches.items():
             seg_gt_list.append(v['seg_gt'])
             seg_pred_list.append(v['seg_pred'])
-        seg_gt_all = torch.cat(seg_gt_list, dim=0).cuda()
-        seg_pred_all = torch.cat(seg_pred_list, dim=0).cuda()
+        seg_gt_all = torch.cat(seg_gt_list, dim=0).to(device)
+        seg_pred_all = torch.cat(seg_pred_list, dim=0).to(device)
         seg_pred_all[seg_pred_all >= thresh] = 1
         seg_pred_all[seg_pred_all < thresh] = 0
         assert seg_gt_all.shape == seg_pred_all.shape

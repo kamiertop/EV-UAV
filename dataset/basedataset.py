@@ -3,6 +3,7 @@ import numpy as np
 from torch.autograd import Function
 import HAIS_OP
 import spconv.pytorch as spconv
+from utils import args
 
 class Voxelization_Idx(Function):
     @staticmethod
@@ -47,7 +48,7 @@ class Voxelization(Function):
         M = map_rule.size(0)
         maxActive = map_rule.size(1) - 1
 
-        output_feats = torch.zeros(M, C, device="cuda")
+        output_feats = torch.zeros(M, C, device=feats.device)
 
         ctx.for_backwards = (map_rule, mode, maxActive, N)
 
@@ -59,7 +60,7 @@ class Voxelization(Function):
         map_rule, mode, maxActive, N = ctx.for_backwards
         M, C = d_output_feats.size()
 
-        d_feats = torch.zeros(N, C, device="cuda")
+        d_feats = torch.zeros(N, C, device=d_output_feats.device)
 
         HAIS_OP.voxelize_bp(d_output_feats.contiguous(), d_feats, map_rule, mode, M, maxActive, C)
         return d_feats, None, None
@@ -81,6 +82,8 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
     @staticmethod
     def custom_collate(batch):
+        device = f"cuda:{args.cfg.gpu}"
+
         batch_size = len(batch)
         loc_batches=[]
         feature_batches=[]
@@ -116,12 +119,12 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
         feature_batches = torch.from_numpy(np.concatenate(feature_batches, axis=0)).contiguous()
         feature_batches =feature_batches.float()
-        voxel_feats = voxelization(feature_batches.cuda(), v2p_map.cuda(), 4)
-        voxel_feats = voxel_feats.cuda()
+        voxel_feats = voxelization(feature_batches.to(device), v2p_map.to(device), 4)
+        voxel_feats = voxel_feats.to(device)
 
 
         spatial_shape = np.array([11*32,9*32,256*32])
-        voxel_ev = spconv.SparseConvTensor(voxel_feats, voxel_locs.int().cuda(), spatial_shape, batch_size)
+        voxel_ev = spconv.SparseConvTensor(voxel_feats, voxel_locs.int().to(device), spatial_shape, batch_size)
 
         output = {}
 
