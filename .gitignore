@@ -1,0 +1,62 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C/C++/CUDA build artifacts
+*.o
+*.so
+*.a
+*.la
+*.lo
+*.dll
+*.dylib
+build/
+
+# Ninja build system
+.ninja_*
+*.ninja
+
+# C extensions (compiled .so)
+*.cpython-*.so
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data files (large, not code)
+data/
+*.h5
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.npy
+*.npz
+
+# Logs
+*.log
+logs/
+
+# Docker
+.dockerignore
+
+# Hugging Face
+.accelerate/
+.cache/huggingface/
