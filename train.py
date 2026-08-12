@@ -73,7 +73,7 @@ def main():
         )
 
         for batch_idx, ev in enumerate(train_dataloader):
-            x = ev["voxel_ev"]
+            x = dataset.voxelize_to_sparse(ev, device)
             label = ev["seg_label"].float().to(device)
             p2v_map = ev["p2v_map"].long().to(device)
             ev_locs = ev["locs"].float().requires_grad_()
@@ -104,7 +104,7 @@ def main():
 
         with torch.no_grad():
             for sample, ev in enumerate(val_dataloader):
-                x = ev["voxel_ev"]
+                x = val_dataset.voxelize_to_sparse(ev, device)
                 label = ev["seg_label"].float().to(device)
                 p2v_map = ev["p2v_map"].long().to(device)
 

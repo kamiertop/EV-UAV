@@ -37,7 +37,7 @@ def run_test(model_path: str, cfg, *, device: str = "cuda:0") -> dict:
 
     for sample, ev in enumerate(loader):
         with torch.no_grad():
-            x = ev["voxel_ev"]
+            x = dataset.voxelize_to_sparse(ev, device)
             label = ev["seg_label"].float().to(device)
             p2v_map = ev["p2v_map"].long().to(device)
             ev_locs = ev["locs"].float().requires_grad_()

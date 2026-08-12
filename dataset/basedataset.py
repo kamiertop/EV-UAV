@@ -80,9 +80,7 @@ class BaseDataLoader(torch.utils.data.Dataset):
         self.whole_t = configs.whole_t
         self.res = configs.res
 
-    @staticmethod
-    def custom_collate(batch):
-        device = f"cuda:{args.cfg.gpu}"
+    def custom_collate(self, batch):
 
         batch_size = len(batch)
         loc_batches=[]
@@ -119,26 +117,13 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
         feature_batches = torch.from_numpy(np.concatenate(feature_batches, axis=0)).contiguous()
         feature_batches =feature_batches.float()
-        feature_batches = feature_batches.to(device)
-        p2v_map_device = p2v_map.to(device=device, dtype=torch.long)
-        voxel_feats = torch.zeros(
-            (voxel_locs.shape[0], feature_batches.shape[1]),
-            dtype=feature_batches.dtype,
-            device=device,
-        )
-        voxel_feats.index_add_(0, p2v_map_device, feature_batches)
-        voxel_counts = torch.bincount(
-            p2v_map_device, minlength=voxel_locs.shape[0]
-        ).clamp_min_(1)
-        voxel_feats = voxel_feats / voxel_counts.unsqueeze(1)
-
-
-        spatial_shape = np.array([11*32,9*32,256*32])
-        voxel_ev = spconv.SparseConvTensor(voxel_feats, voxel_locs.int().to(device), spatial_shape, batch_size)
 
         output = {}
 
-        output['voxel_ev'] = voxel_ev
+        output['features'] = feature_batches
+        output['voxel_locs'] = voxel_locs
+        output['v2p_map'] = v2p_map
+        output['batch_size'] = batch_size
         output['seg_label'] = torch.from_numpy(seg_label_batches)
         output['p2v_map'] = p2v_map
         output['locs'] = locs_batches
@@ -146,4 +131,13 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
         return output
 
+    def voxelize_to_sparse(self, batch, device):
+        voxel_feats = voxelization(
+            batch['features'].to(device), batch['v2p_map'].to(device), 4
+        )
+        spatial_shape = np.array([11*32, 9*32, 256*32])
+        return spconv.SparseConvTensor(
+            voxel_feats, batch['voxel_locs'].int().to(device),
+            spatial_shape, batch['batch_size'],
+        )
 
