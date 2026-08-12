@@ -119,8 +119,18 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
         feature_batches = torch.from_numpy(np.concatenate(feature_batches, axis=0)).contiguous()
         feature_batches =feature_batches.float()
-        voxel_feats = voxelization(feature_batches.to(device), v2p_map.to(device), 4)
-        voxel_feats = voxel_feats.to(device)
+        feature_batches = feature_batches.to(device)
+        p2v_map_device = p2v_map.to(device=device, dtype=torch.long)
+        voxel_feats = torch.zeros(
+            (voxel_locs.shape[0], feature_batches.shape[1]),
+            dtype=feature_batches.dtype,
+            device=device,
+        )
+        voxel_feats.index_add_(0, p2v_map_device, feature_batches)
+        voxel_counts = torch.bincount(
+            p2v_map_device, minlength=voxel_locs.shape[0]
+        ).clamp_min_(1)
+        voxel_feats = voxel_feats / voxel_counts.unsqueeze(1)
 
 
         spatial_shape = np.array([11*32,9*32,256*32])
@@ -135,6 +145,5 @@ class BaseDataLoader(torch.utils.data.Dataset):
         output['idx_label'] = idx_label_batches
 
         return output
-
 
 
