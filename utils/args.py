@@ -14,9 +14,7 @@ from typing import Any
 cfg: argparse.Namespace | None = None
 
 
-def parse(
-    extra: list[tuple[str, dict[str, Any]]] | None = None,
-) -> argparse.Namespace:
+def parse(extra: list[tuple[str, dict[str, Any]]] | None = None) -> argparse.Namespace:
     """Parse CLI arguments; store result in ``utils.args.cfg`` and return it.
 
     ``cfg`` is a module-level attribute, so other modules can access it with
@@ -58,16 +56,14 @@ def parse(
     parser.add_argument("--epochs", default=50, type=int)
     parser.add_argument("--lr", default=0.001, type=float)
     parser.add_argument("--optim", default="Adam", choices=["Adam", "SGD"])
-    parser.add_argument("--k", default=3, type=int,
-                        help="STC loss k-nearest neighbours")
-    parser.add_argument("--t", default=5, type=int,
-                        help="STC loss time threshold")
-    parser.add_argument("--seed", default=37, type=int)
+    parser.add_argument("--k", default=3, type=int, help="STC loss k-nearest neighbours")
+    parser.add_argument("--t", default=5, type=int, help="STC loss time threshold")
+    parser.add_argument("--seed", default=37, type=int, help="random seed")
 
     # ── evaluation ──────────────────────────────────────────────────
     parser.add_argument("--eval", default=True, type=bool)
     parser.add_argument("--vis", default=False, type=bool)
-    parser.add_argument("--roc", default=False, type=bool)
+    parser.add_argument("--roc", default=True, type=bool)
     parser.add_argument("--pd_detT", default=50, type=int,
                         help="detection time window for ROC")
     parser.add_argument("--correct_thresh", default=0.0001, type=float)
@@ -77,6 +73,4 @@ def parse(
         for flag, kwargs in extra:
             parser.add_argument(flag, **kwargs)
 
-    cfg = parser.parse_args()
-
-    return cfg
+    return parser.parse_args()

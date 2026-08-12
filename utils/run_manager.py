@@ -48,9 +48,23 @@ class RunManager:
         record = {"epoch": epoch, "timestamp": datetime.now().isoformat()}
         if batch is not None:
             record["batch"] = batch
-        record.update(metrics)
+        record.update({key: self._json_value(value) for key, value in metrics.items()})
         self._log_file.write(json.dumps(record, ensure_ascii=False) + "\n")
         self._log_file.flush()
+
+    @staticmethod
+    def _json_value(value):
+        """Convert common tensor/NumPy scalars to JSON-compatible values."""
+        if hasattr(value, "detach"):
+            value = value.detach().cpu()
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except ValueError:
+                pass
+        if hasattr(value, "tolist"):
+            return value.tolist()
+        return value
 
     # ---- checkpoints ----
 
