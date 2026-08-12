@@ -20,6 +20,12 @@ build/
 # C extensions (compiled .so)
 *.cpython-*.so
 
+# Python packaging artifacts
+*.egg-info/
+*.eggs/
+dist/
+*.whl
+
 # IDE / Editor
 .idea/
 .vscode/
@@ -53,6 +59,9 @@ data/
 # Logs
 *.log
 logs/
+
+# Documents (papers, presentations)
+*.pdf
 
 # Docker
 .dockerignore

@@ -9,7 +9,6 @@ from model.evspsegnet import evspsegnet
 from utils.stcloss import STCLoss
 
 import torch.optim as optim
-import mlflow
 import tqdm
 from utils.eval import evalute
 
@@ -56,10 +55,6 @@ if __name__ == '__main__':
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=cfg.batch_size,collate_fn=val_dataset.custom_collate)
     evaluter = evalute(cfg)
 
-    # mlflow
-    mlflow.set_experiment('train')
-    mlflow.start_run(run_name='train')
-
     for epoch in range(cfg.epochs):
         pbar = tqdm.tqdm(total=len(train_dataloader), unit="Batch", unit_scale=True,
                          desc="Epoch: {}".format(epoch),position=0,leave=True)
@@ -82,7 +77,6 @@ if __name__ == '__main__':
             pbar.update(1)
 
             with torch.no_grad():
-                mlflow.log_metric('loss', loss.item())
                 if loss.item()<best_loss:
                     torch.save(net.state_dict(),cfg.model_save_root+'/best_loss_seed{}.pt'.format(seed))
                     best_loss = loss.item()

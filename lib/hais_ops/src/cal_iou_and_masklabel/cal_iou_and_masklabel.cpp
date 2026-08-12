@@ -9,15 +9,15 @@ void cal_iou_and_masklabel(at::Tensor proposals_idx_tensor, at::Tensor proposals
         at::Tensor proposals_iou_tensor, int nInstance, int nProposal, 
         at::Tensor mask_scores_sigmoid_tensor, at::Tensor mask_labels_tensor,
         int mode){
-    int *proposals_idx = proposals_idx_tensor.data<int>();
-    int *proposals_offset = proposals_offset_tensor.data<int>();
-    long *instance_labels = instance_labels_tensor.data<long>();
-    int *instance_pointnum = instance_pointnum_tensor.data<int>();
+    int *proposals_idx = proposals_idx_tensor.data_ptr<int>();
+    int *proposals_offset = proposals_offset_tensor.data_ptr<int>();
+    long *instance_labels = instance_labels_tensor.data_ptr<long>();
+    int *instance_pointnum = instance_pointnum_tensor.data_ptr<int>();
 
-    float *proposals_iou = proposals_iou_tensor.data<float>();
+    float *proposals_iou = proposals_iou_tensor.data_ptr<float>();
 
-    float *mask_scores_sigmoid = mask_scores_sigmoid_tensor.data<float>();
-    float *mask_label = mask_labels_tensor.data<float>();
+    float *mask_scores_sigmoid = mask_scores_sigmoid_tensor.data_ptr<float>();
+    float *mask_label = mask_labels_tensor.data_ptr<float>();
 
 
 
