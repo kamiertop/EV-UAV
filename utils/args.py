@@ -95,8 +95,16 @@ def parse(extra: list[tuple[str, dict[str, Any]]] | None = None) -> argparse.Nam
     parser.add_argument("--val_start_epoch", default=0, type=int)
     parser.add_argument("--val_interval", default=1, type=int)
     parser.add_argument(
+        "--early_stopping_patience", default=10, type=int,
+        help="number of validation rounds without IoU improvement before stopping; 0 disables",
+    )
+    parser.add_argument(
+        "--early_stopping_min_delta", default=1e-4, type=float,
+        help="minimum validation IoU improvement counted as progress",
+    )
+    parser.add_argument(
         "--test_after_train", action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
         help="evaluate the held-out test split after model selection",
     )
 

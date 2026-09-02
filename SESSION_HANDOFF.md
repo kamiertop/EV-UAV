@@ -105,6 +105,8 @@ MBTC 包含：
 - `RESEARCH_PLAN.md`：完整研究计划；
 - `TRAINING_COMMANDS.md`：服务器训练命令。
 
+最新改动：`train.py` 已加入基于验证 IoU 的 early stopping；`utils/args.py` 中 `test_after_train` 默认改为开启。默认连续 10 个验证轮次无至少 `1e-4` 提升即停止，并在结束后自动测试最佳 IoU checkpoint。使用 `--no-test_after_train` 可关闭自动测试，使用 `--early_stopping_patience 0` 可禁用早停。
+
 工作区当前是 dirty，尚未提交；不要执行 `git reset --hard`、`git checkout --` 等会覆盖改动的命令。
 
 ## 6. 已完成验证
@@ -217,4 +219,3 @@ UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python scripts/summarize_runs.py
 4. 若用户已上传代码但尚未训练，指导其执行第 8.1 和 8.2 节命令；
 5. 若 smoke test 报错，先定位 CUDA/spconv/HAIS_OP、张量 shape、索引或显存问题，再考虑修改代码；
 6. 若已有 A0–A4 日志，使用 `scripts/summarize_runs.py` 汇总并据结果决定最终论文主线，不预设 MBTC 或 MC-GDSC 一定有效。
-

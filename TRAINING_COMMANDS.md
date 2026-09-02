@@ -78,7 +78,15 @@ UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python train.py \
   --seed 37 --epochs 50 --patch_attention sequence --motion_gd shallow --loss mbtc
 ```
 
-训练命令默认只使用 train/val，不会自动评估 test。
+训练命令默认只使用 train/val 进行模型选择；训练结束后会自动加载最佳 IoU checkpoint 并评估 test split。若只想训练不测试，可显式添加 `--no-test_after_train`。
+
+默认早停参数为验证 IoU 连续 10 个验证轮次没有至少 `1e-4` 的提升时停止。可通过以下参数调整：
+
+```bash
+--early_stopping_patience 10 --early_stopping_min_delta 1e-4
+```
+
+设置 `--early_stopping_patience 0` 可禁用早停。
 
 ## 3. 找到每组最佳验证结果
 

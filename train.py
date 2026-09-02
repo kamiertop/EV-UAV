@@ -93,7 +93,11 @@ def main():
 
     # ── training loop ───────────────────────────────────────────────
     best_loss = 1e5
-    best_iou = 0.0
+    # Use -inf so the first validation pass always defines and saves a
+    # selectable checkpoint, even if its IoU is very small.
+    best_iou = float("-inf")
+    epochs_without_improvement = 0
+    validation_rounds = 0
 
     for epoch in range(args.cfg.epochs):
         net.train()
@@ -189,11 +193,37 @@ def main():
                 seg_acc=seg_acc.item(), **trajectory_metrics,
             )
 
-            if iou.item() > best_iou:
+            validation_rounds += 1
+            if (
+                validation_rounds == 1
+                or iou.item() > best_iou + args.cfg.early_stopping_min_delta
+            ):
                 run.save_checkpoint(net, f"best_iou_seed{args.cfg.seed}.pt")
                 best_iou = iou.item()
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
 
-    run.log_metric(args.cfg.epochs, None, best_loss=best_loss, best_iou=best_iou)
+            patience = args.cfg.early_stopping_patience
+            if patience > 0 and epochs_without_improvement >= patience:
+                print(
+                    f"[train] Early stopping at epoch {epoch}: "
+                    f"no validation IoU improvement for {patience} rounds "
+                    f"(best IoU={best_iou:.4f})."
+                )
+                run.log_metric(
+                    epoch, None,
+                    early_stopped=True,
+                    early_stopping_patience=patience,
+                    validation_rounds=validation_rounds,
+                )
+                break
+
+    run.log_metric(
+        epoch + 1, None, best_loss=best_loss, best_iou=best_iou,
+        early_stopped=(epoch + 1 < args.cfg.epochs),
+        validation_rounds=validation_rounds,
+    )
     print(f"[train] Done. Best loss={best_loss:.4f}, best IoU={best_iou:.4f}")
 
     # ── optional test on best checkpoint ───────────────────────────

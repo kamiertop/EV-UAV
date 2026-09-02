@@ -107,6 +107,8 @@ h_i=y_i(1-S_i^{gt})+(1-y_i)S_i^{pred},
 - `metrics.jsonl`：batch loss、验证 IoU/ACC/轨迹指标；
 - `checkpoints/best_iou_seed*.pt`：验证集选出的 checkpoint。
 
+训练默认启用 early stopping：验证 IoU 连续 10 个验证轮次没有至少 `1e-4` 的提升时停止；训练结束后默认自动使用最佳 IoU checkpoint 评估 test split。可用 `--no-test_after_train` 关闭自动测试，或用 `--early_stopping_patience 0` 禁用早停。
+
 训练默认不访问测试集。完成验证集模型选择后，用独立 `test.py` 命令评估一次测试集。不要依据测试结果继续调参。
 
 ## 7. 当前验证状态
