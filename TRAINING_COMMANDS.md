@@ -149,3 +149,35 @@ UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python test.py \
 - DataLoader worker 崩溃：先加 `--train_workers 0`；稳定后再恢复 4 或 8。
 - OOM：项目默认 batch size 为 1；仍 OOM 时降低 `--max_events_num`，但所有对照必须使用相同值。
 - deterministic/spconv 报错：保留完整错误日志，不要直接关闭确定性设置后与旧结果混用。
+
+## 7. 网格搜索（笛卡尔积）
+
+使用 `scripts/grid_search.py` 可以自动遍历参数组合，实验按顺序运行，单组失败默认不会阻塞后续组合。每次搜索会在 `runs/grid_searches/` 写入 `manifest.jsonl`。
+
+先预览组合数量和命令：
+
+```bash
+UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python scripts/grid_search.py \
+  --dry_run --gpu 0 --epochs 50 --seeds 37 \
+  --losses stc,mbtc --motion_gds none,shallow
+```
+
+正式运行示例（2×2×3 = 12 组）：
+
+```bash
+UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python scripts/grid_search.py \
+  --gpu 0 --data_dir /data/ev-uav --epochs 50 --train_workers 0 \
+  --run_prefix ablation \
+  --seeds 37 \
+  --losses stc,mbtc \
+  --motion_gds none,shallow \
+  --trajectory_weights 0.1,0.25,0.5
+```
+
+可网格化的参数包括 `losses`、`motion_gds`、`patch_attentions`、`trajectory_weights`、`support_weights`、`motion_direction_weights`、`motion_speed_weights`、`route_weights`、`route_temperatures`、`patience` 和 `max_events_num`。组合数是这些列表长度的乘积；用 `--max_runs N` 可限制前 N 组。
+
+网格搜索默认训练结束自动测试（继承 `train.py` 默认行为），并启用每组的 early stopping。结果汇总：
+
+```bash
+UV_CACHE_DIR=/tmp/ev-uav-uv-cache uv run python scripts/summarize_runs.py
+```
