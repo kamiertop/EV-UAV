@@ -87,6 +87,8 @@ class BaseDataLoader(torch.utils.data.Dataset):
         feature_batches=[]
         seg_label_batches=[]
         idx_label_batches = []
+        motion_target_batches=[]
+        motion_valid_batches=[]
 
         for i,ev in enumerate(batch):
             ev_loc = ev['ev_loc']
@@ -102,6 +104,8 @@ class BaseDataLoader(torch.utils.data.Dataset):
 
             idx_label =ev['idx']
             idx_label_batches.append(idx_label)
+            motion_target_batches.append(ev['motion_target'])
+            motion_valid_batches.append(ev['motion_valid'])
 
 
 
@@ -128,6 +132,12 @@ class BaseDataLoader(torch.utils.data.Dataset):
         output['p2v_map'] = p2v_map
         output['locs'] = locs_batches
         output['idx_label'] = idx_label_batches
+        output['motion_target'] = torch.from_numpy(
+            np.concatenate(motion_target_batches, axis=0)
+        ).float()
+        output['motion_valid'] = torch.from_numpy(
+            np.concatenate(motion_valid_batches, axis=0)
+        ).bool()
 
         return output
 
@@ -140,4 +150,3 @@ class BaseDataLoader(torch.utils.data.Dataset):
             voxel_feats, batch['voxel_locs'].int().to(device),
             spatial_shape, batch['batch_size'],
         )
-

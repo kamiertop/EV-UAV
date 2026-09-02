@@ -19,7 +19,10 @@ def main():
 
     if "pd" in results:
         print(f"iou={results['iou']:.4f}  seg_acc={results['seg_acc']:.4f}  "
-              f"pd={results['pd']:.4f}  fa={results['fa']:.4f}")
+              f"pd={results['pd']:.4f}  fa={results['fa']:.6g}  "
+              f"coverage={results['trajectory_coverage']:.4f}  "
+              f"longest={results['trajectory_longest_ratio']:.4f}  "
+              f"fragmentation={results['trajectory_fragmentation']:.4f}")
     else:
         print(f"iou={results['iou']:.4f}  seg_acc={results['seg_acc']:.4f}")
 

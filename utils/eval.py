@@ -20,13 +20,22 @@ def run_test(model_path: str, cfg, *, device: str = "cuda:0") -> dict:
     from model.evspsegnet import evspsegnet
 
     net = evspsegnet(cfg).eval().to(device)
-    net.load_state_dict(torch.load(model_path, weights_only=True))
+    try:
+        net.load_state_dict(torch.load(model_path, weights_only=True), strict=True)
+    except RuntimeError as error:
+        raise RuntimeError(
+            "Checkpoint architecture does not match the evaluation flags. "
+            "Use the same --patch_attention, --motion_gd, --loss, and --width "
+            "stored in the run's config.json."
+        ) from error
     print(f"[eval] Loaded checkpoint: {model_path}")
 
     dataset = EvUAV(cfg, mode="test")
     loader = torch.utils.data.DataLoader(
         dataset, batch_size=cfg.batch_size,
         collate_fn=dataset.custom_collate,
+        num_workers=cfg.train_workers,
+        pin_memory=True,
     )
 
     evaluator = evalute(cfg)
@@ -40,27 +49,42 @@ def run_test(model_path: str, cfg, *, device: str = "cuda:0") -> dict:
             x = dataset.voxelize_to_sparse(ev, device)
             label = ev["seg_label"].float().to(device)
             p2v_map = ev["p2v_map"].long().to(device)
-            ev_locs = ev["locs"].float().requires_grad_()
-            idx = ev["idx_label"]
+            ev_locs = ev["locs"].float()
+            idx = torch.as_tensor(ev["idx_label"], dtype=torch.long)
             ts = ev_locs[:, 3]
 
-            preds, voxel = net(x)
+            preds, _, _ = net(x)
             preds = preds[p2v_map].squeeze().cpu()
 
             if cfg.eval:
                 evaluator.matches[str(sample)] = {
                     "seg_pred": preds,
                     "seg_gt": label,
+                    "trajectory_ids": idx,
+                    "trajectory_times": ev_locs[:, 3].cpu(),
+                    "trajectory_batches": ev_locs[:, 0].cpu(),
                 }
                 if cfg.roc:
-                    evaluator.roc_update(ts, preds, idx, label.cpu(), ev_locs)
+                    evaluator.roc_update(
+                        ts, preds, idx, label.cpu(), ev_locs,
+                        thresh=cfg.prediction_thresh,
+                    )
 
         pbar.update(1)
 
     results: dict = {}
     if cfg.eval:
-        results["iou"] = evaluator.evaluate_semantic_segmantation_miou()
-        results["seg_acc"] = evaluator.evaluate_semantic_segmantation_accuracy()
+        results["iou"] = evaluator.evaluate_semantic_segmantation_miou(
+            thresh=cfg.prediction_thresh,
+        )
+        results["seg_acc"] = evaluator.evaluate_semantic_segmantation_accuracy(
+            thresh=cfg.prediction_thresh, device=device,
+        )
+        results.update(evaluator.evaluate_trajectory_metrics(
+            thresh=cfg.prediction_thresh,
+            bin_ms=cfg.trajectory_bin_ms,
+            correct_thresh=cfg.trajectory_correct_thresh,
+        ))
         if cfg.roc:
             results["pd"], results["fa"] = evaluator.cal_roc()
     return results
@@ -70,6 +94,7 @@ class evalute():
     def __init__(self, cfg):
         self.matches = {}
         self.data = pd.DataFrame()
+        self.prediction_thresh = getattr(cfg, "prediction_thresh", 0.9)
 
         if cfg.roc:
             self.pd_detT = cfg.pd_detT
@@ -88,7 +113,7 @@ class evalute():
             idx_frame, preds_frame, label_frame, ev_locs_frame = idx[t_range], preds[t_range], label[t_range], \
                 ev_locs[:, 1:4][t_range]
             preds_frame_ori = preds_frame.clone()
-            idx_list_frame = set(idx_frame)
+            idx_list_frame = set(idx_frame.tolist())
             false_mask = np.zeros((260, 346), dtype=np.uint8)
             preds_frame[preds_frame_ori >= thresh] = 1
             preds_frame[preds_frame_ori < thresh] = 0
@@ -112,8 +137,8 @@ class evalute():
             self.false_num += (num_labels - 1)
 
     def cal_roc(self):
-        pd = self.correct_num / self.obj_num
-        fa = self.false_num / (self.frame_num * 346 * 260)
+        pd = self.correct_num / max(self.obj_num, 1)
+        fa = self.false_num / max(self.frame_num * 346 * 260, 1)
         return pd, fa
 
     def evaluate_semantic_segmantation_miou(self, thresh=0.9):
@@ -134,12 +159,14 @@ class evalute():
                 union = ((seg_gt_all == _index) | (seg_pred_all == _index)).sum()
                 iou = intersection.float() / union
                 iou_list.append(iou)
-        iou_tensor = torch.tensor(iou_list)
+        if not iou_list:
+            return torch.tensor(0.0)
+        iou_tensor = torch.stack(iou_list)
         miou = iou_tensor.mean()
         return miou
 
-    def evaluate_semantic_segmantation_accuracy(self, thresh=0.9):
-        device = f"cuda:{_args.cfg.gpu}"
+    def evaluate_semantic_segmantation_accuracy(self, thresh=0.9, device=None):
+        device = device or f"cuda:{_args.cfg.gpu}"
         seg_gt_list = []
         seg_pred_list = []
         for k, v in self.matches.items():
@@ -154,3 +181,75 @@ class evalute():
         whole = (seg_gt_all == 1).sum()
         seg_accuracy = correct.float() / whole.float()
         return seg_accuracy
+
+    def evaluate_trajectory_metrics(
+        self,
+        thresh=0.9,
+        bin_ms=50.0,
+        correct_thresh=0.1,
+        min_events=2,
+    ):
+        """Report target temporal coverage, longest run, and fragmentation."""
+        coverages = []
+        longest_ratios = []
+        fragmentations = []
+        for record in self.matches.values():
+            pred = torch.as_tensor(record["seg_pred"]).reshape(-1).numpy()
+            ids = np.asarray(record.get("trajectory_ids", []))
+            times = torch.as_tensor(
+                record.get("trajectory_times", []),
+            ).reshape(-1).numpy()
+            batches = torch.as_tensor(
+                record.get("trajectory_batches", np.zeros_like(ids)),
+            ).reshape(-1).numpy()
+            if (
+                pred.shape[0] != ids.shape[0]
+                or pred.shape[0] != times.shape[0]
+                or pred.shape[0] != batches.shape[0]
+            ):
+                continue
+            predicted = pred >= thresh
+            for batch_id in np.unique(batches):
+                sample = batches == batch_id
+                for instance_id in np.unique(ids[sample & (ids > 0)]):
+                    foreground = sample & (ids == instance_id)
+                    if int(foreground.sum()) < min_events:
+                        continue
+                    track_times = times[foreground]
+                    track_predictions = predicted[foreground]
+                    bins = np.floor(
+                        (track_times - track_times.min())
+                        / max(float(bin_ms), 1e-6)
+                    ).astype(np.int64)
+                    occupied = np.unique(bins)
+                    detected = np.asarray([
+                        track_predictions[bins == bin_id].mean() >= correct_thresh
+                        for bin_id in occupied
+                    ], dtype=bool)
+                    if detected.size == 0:
+                        continue
+                    coverages.append(float(detected.mean()))
+                    padded = np.pad(detected.astype(np.int8), (1, 1))
+                    starts = np.flatnonzero(
+                        (padded[1:] == 1) & (padded[:-1] == 0)
+                    )
+                    ends = np.flatnonzero(
+                        (padded[:-1] == 1) & (padded[1:] == 0)
+                    )
+                    longest = int((ends - starts).max()) if starts.size else 0
+                    longest_ratios.append(float(longest / detected.size))
+                    fragmentations.append(float(starts.size / detected.size))
+
+        if not coverages:
+            return {
+                "trajectory_coverage": 0.0,
+                "trajectory_longest_ratio": 0.0,
+                "trajectory_fragmentation": 0.0,
+                "trajectory_count": 0,
+            }
+        return {
+            "trajectory_coverage": float(np.mean(coverages)),
+            "trajectory_longest_ratio": float(np.mean(longest_ratios)),
+            "trajectory_fragmentation": float(np.mean(fragmentations)),
+            "trajectory_count": len(coverages),
+        }
